@@ -11,41 +11,50 @@ data Animal = Animal {
     peso :: Number,
     edad :: Number,
     enfermo :: Bool,
-    diasDeRecuperacion :: [Number],
-    gastosGenerados :: [Number]
-} deriving (Show)
+    visitasMedicas :: [VisitaMedica]
+} deriving (Show, Eq)
+
+data VisitaMedica = VisitaMedica{
+    diasDeRecuperacion :: Number,
+    costo :: Number
+} deriving (Show, Eq)
 
 type Actividad = Animal -> Animal
 
 laPasoMal :: Animal -> Bool
-laPasoMal = any (>30) . diasDeRecuperacion
+laPasoMal = any ((>30) . diasDeRecuperacion) . visitasMedicas
 
 nombreFalopa :: Animal -> Bool
 nombreFalopa = (=='i') . last . nombre
 
-engorde :: Number -> Actividad
-engorde kilos animal = animal {peso = peso animal + min 5 (kilos / 2)}
+--AUX
+modificarPeso :: Number -> Actividad
+modificarPeso kilos animal = animal {
+    peso = peso animal + kilos
+}
 
-revisacion :: Number -> Number -> Actividad
-revisacion dias costo animal    |   enfermo animal = engorde 2 (animal { diasDeRecuperacion = dias  : diasDeRecuperacion animal,
-                                                                        gastosGenerados    = costo : gastosGenerados animal})
-                                |   otherwise = animal
+engorde :: Number -> Actividad
+engorde kilos = modificarPeso (5 `min` (kilos / 2))
+
+revisacion :: VisitaMedica -> Actividad
+revisacion visita animal    |   enfermo animal = engorde 2 (animal {visitasMedicas = visita : visitasMedicas animal})
+                            |   otherwise = animal
 
 festejoCumple :: Actividad
-festejoCumple animal = animal {edad = edad animal + 1,
-                               peso = peso animal - 1}
+festejoCumple animal = modificarPeso (-1) animal {edad = edad animal + 1}
 
 chequeoDePeso :: Number -> Actividad
-chequeoDePeso pesoMinimo animal | peso animal <= pesoMinimo = animal {enfermo = True}    
-                                | otherwise = animal
+chequeoDePeso pesoMinimo animal = animal {enfermo = peso animal <= pesoMinimo}
 
-proceso :: [Actividad] -> Animal -> Animal
+type Proceso = [Actividad]
+
+proceso :: Proceso -> Animal -> Animal
 proceso actividades animal = foldl (flip ($)) animal actividades
 
 -- Ejemplo de evaluación por consola
--- proceso [engorde 10, revisacion 5 100, festejoCumple, chequeoDePeso 10] (Animal "Pepito" "Perro" 10 5 False [] [])
+-- > proceso [engorde 10, revisacion (visitaMedica 24), festejoCumple, chequeoDePeso 10] (Animal "Pepito" "Perro" 10 5 False [])
 
-mejora :: [Actividad] -> Animal -> Bool
+mejora :: Proceso -> Animal -> Bool
 mejora [] _ = True
 mejora [actividad1] _ = True
 mejora (actividad1:actividad2:actividades) animal = peso (actividad2 animal) >= peso (actividad1 animal) && peso (actividad2 animal) - peso (actividad1 animal) <= 3 && mejora (actividad2:actividades) (actividad1 animal)
@@ -53,4 +62,4 @@ mejora (actividad1:actividad2:actividades) animal = peso (actividad2 animal) >= 
 animalesFalopa :: [Animal] -> [Animal]
 animalesFalopa = take 3 . filter nombreFalopa
 
---Sería posible obtener un valor computable para la función del punto anterior, ya que la función take 3 terminaría de ejecutarse cuando encuentre 3 nombres de animales que cumplan con el criterio de filter. Esto se relaciona con el concepto de evaluación perezosa, ya que Haskell no evalúa la lista completa, sino que va evaluando los elementos de la lista a medida que los necesita. En el caso que nunca encuentre 3 nombres de animales que cumplan con el criterio de filter, la función no terminaría de ejecutarse.
+--Es posible obtener un valor para la función del punto anterior, ya que la función take 3 terminaría de ejecutarse cuando encuentre 3 nombres de animales que cumplan con el criterio de filter, en este caso se dice que la lista converge. Esto se relaciona con el concepto de Lazy Evaluation. Haskell no evalúa la lista completa, sino que va evaluando los elementos de la lista a medida que los necesita. En el caso que nunca encuentre 3 nombres de animales que cumplan con el criterio de filter, la función no terminaría de ejecutarse y llenaria la memoria.
